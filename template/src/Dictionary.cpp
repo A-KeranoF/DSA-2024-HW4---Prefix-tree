@@ -32,6 +32,8 @@ bool Dictionary::contains(const char* word) const noexcept
 {
     if (!word) return false;
     if (!prefixTree) return false;
+    if (!isCorrectWord(word)) return false;
+    
     Node* head = prefixTree;
     const size_t length = strlen(word);
     for (int i = 0; i < length; ++i) {
@@ -52,9 +54,18 @@ size_t Dictionary::size() const noexcept
 bool Dictionary::isCorrectWord(const char* word) noexcept
 {
     if (!word || *word == '\0') return false;
+    
     const size_t length = strlen(word);
     for (int i = 0; i < length; ++i) {
-        if (!isalpha(word[i])) {
+        char letter = word[i];
+        
+        // check for non-ASCII characters
+        if ((unsigned char)letter < 0 || (unsigned char)letter > 127)
+        {
+            return false;
+        }
+        
+        if (!isalpha(letter)) {
             return false;
         }
     }
@@ -118,11 +129,11 @@ Dictionary::Node* Dictionary::createNode() {
 
 Dictionary::Node* Dictionary::copy(Node* node)
 {
+    if (!node) 
+        return nullptr;
     Node* newNode = createNode();
     newNode->isWord = node->isWord;
-    for (size_t i = 0; i < ALPHABET_SIZE; i++)
-    {
-        if (!node) return node;
+    for (size_t i = 0; i < ALPHABET_SIZE; i++) {
         newNode->successors[i] = copy(node->successors[i]);
     }
     return newNode;
