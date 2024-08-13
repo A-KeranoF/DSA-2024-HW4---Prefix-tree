@@ -1,5 +1,0 @@
-# This line is a comment and must be ignored
-xyz
-abcabc
-
-1234567890
