@@ -1,7 +1,7 @@
 #pragma once
 
+#include <cstdint>
 #include <stdexcept>
-#include <unordered_set>
 #include <iostream>
 
 class incorrect_word_exception : public std::runtime_error {
@@ -18,7 +18,7 @@ public:
     void insert(const char* word);
     void erase(const char* word) noexcept;
     bool contains(const char* word) const noexcept;
-    size_t size() const noexcept;
+    [[nodiscard]] size_t size() const noexcept;
     static bool isCorrectWord(const char* word) noexcept;
 
 public:
@@ -28,20 +28,19 @@ public:
     Dictionary& operator=(const Dictionary& other);
 
 private:
-    const static int ALPHABET_SIZE = 'Z' - 'A' + 1; 
     struct Node {
-        bool isWord;
-        Node* successors[ALPHABET_SIZE];
+        uint32_t wordPlacement;
+        Node* next;
+        explicit Node(const uint32_t data = 0, Node* next = nullptr) : wordPlacement(data), next(next) {};
     };
 
-    Node* prefixTree;
+    Node* bitList;
     size_t numberOfWords;
 
 private:
-    Node* eraseHelper(Node* root, const char* word);
-    Node* createNode();
-    Node* copy(Node* node);
+    void eraseHelper(Node* root, const char* word);
+    Node* copyNodes(const Node* node);
     void clear(Node* root);
-    bool hasSuccessors(Node* node);
-    unsigned short letterIndex(const char letter) const;
+    bool hasSuccessors(const Node* node);
+    [[nodiscard]] unsigned short letterIndex(char letter) const;
 };

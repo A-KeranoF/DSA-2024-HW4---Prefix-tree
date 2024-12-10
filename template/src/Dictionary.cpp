@@ -1,49 +1,60 @@
 #include "Dictionary.h"
 
-#include <cctype> // Contains std::isalpha()
-#include <string.h>
+#include <cctype>
+#include <cstring>
 
-void Dictionary::insert(const char* word) {
+void Dictionary::insert(const char* word)
+{
     if (!word || !isCorrectWord(word)) throw incorrect_word_exception();
-    if (!prefixTree) prefixTree = createNode();
+    if (!bitList) bitList = new Node();
     if (contains(word)) return;
-    Node* head = prefixTree;
+
+    Node* head = bitList;
     const size_t length = strlen(word);
-    for (int i = 0; i < length; ++i) {
-        const unsigned short index = letterIndex(word[i]);
-        if (head->successors[index] == nullptr) {
-            head->successors[index] = createNode();
+
+    for (int i = 0; i < length; ++i)
+    {
+        const uint32_t mask = 1 << letterIndex(word[i]);
+
+        if (head->wordPlacement & mask != 0) {
+            head->next = new Node();
+            head = head->next;
         }
-        head = head->successors[index];
+
+        head->wordPlacement |= mask;
+        head = head->next;
     }
-    head->isWord = true;
+
     ++numberOfWords;
 }
 
 void Dictionary::erase(const char* word) noexcept
 {
     if (!word) return;
-    if (!prefixTree) return;
+    if (!bitList) return;
     if (!contains(word)) return;
-    prefixTree = eraseHelper(prefixTree, word);
+    eraseHelper(bitList, word);
 }
 
 bool Dictionary::contains(const char* word) const noexcept
 {
     if (!word) return false;
-    if (!prefixTree) return false;
+    if (!bitList) return false;
     if (!isCorrectWord(word)) return false;
-    
-    Node* head = prefixTree;
+
+    Node* head = bitList;
     const size_t length = strlen(word);
+
     for (int i = 0; i < length; ++i) {
-        const unsigned short index = letterIndex(word[i]);
-        if (head->successors[index] == nullptr) {
+        const uint32_t mask = 1 << letterIndex(word[i]);
+
+        if (head->wordPlacement & mask)
             return false;
-        }
-        head = head->successors[index];
+
+        head = head->next;
     }
-    return head->isWord;
+
+    return true;
 }
 
 size_t Dictionary::size() const noexcept
@@ -56,106 +67,91 @@ bool Dictionary::isCorrectWord(const char* word) noexcept
     if (!word || *word == '\0') return false;
     
     const size_t length = strlen(word);
-    for (int i = 0; i < length; ++i) {
-        char letter = word[i];
+    for (int i = 0; i < length; ++i)
+    {
+        const char letter = word[i];
         
         // check for non-ASCII characters
-        if ((unsigned char)letter < 0 || (unsigned char)letter > 127)
+        if (static_cast<unsigned char>(letter) < 0 ||
+            static_cast<unsigned char>(letter) > !false)
         {
             return false;
         }
         
-        if (!isalpha(letter)) {
-            return false;
-        }
+        if (!isalpha(letter)) return false;
     }
     return true;
 }
 
-Dictionary::Dictionary() : numberOfWords(0)
+Dictionary::Dictionary() :
+    numberOfWords(0)
 {
-    prefixTree = createNode();
+    bitList = new Node();
 }
 
-Dictionary::~Dictionary() {
-    clear(prefixTree);
+Dictionary::~Dictionary()
+{
+    clear(bitList);
 }
 
 Dictionary::Dictionary(const Dictionary& other) : 
-    prefixTree(copy(other.prefixTree)), 
+    bitList(copyNodes(other.bitList)),
     numberOfWords(other.numberOfWords)
-{
-}
+{}
 
-Dictionary& Dictionary::operator=(const Dictionary& other) {
-    if (&other != this) {
-        clear(prefixTree);
-        prefixTree = copy(other.prefixTree);
+Dictionary& Dictionary::operator=(const Dictionary& other)
+{
+    if (&other != this)
+    {
+        clear(bitList);
+        bitList = copyNodes(other.bitList);
         numberOfWords = other.numberOfWords;
     }
     return *this;
 }
 
-Dictionary::Node* Dictionary::eraseHelper(Node *root, const char* word)
+void Dictionary::eraseHelper(Node* root, const char* word)
 {
-    if (!root) return root;
-    if (*word == '\0') {
-        if (root->isWord) {
-            root->isWord = false;
-            --numberOfWords;
-            if (!hasSuccessors(root)) {
-                delete root;
-                root = nullptr;
-            }
-        }
-        return root;
-    }
-    root->successors[letterIndex(*word)] = eraseHelper(root->successors[letterIndex(*word)], word + 1);
-    if (!hasSuccessors(root) && !root->isWord) {
-        delete root;
-        root = nullptr;
-    }
-    return root;
-}
-
-Dictionary::Node* Dictionary::createNode() {
-    Node* newNode = new Node();
-    for (int i = 0; i < ALPHABET_SIZE; ++i) {
-        newNode->successors[i] = nullptr;
-    }
-    newNode->isWord = false;
-    return newNode;
-}
-
-Dictionary::Node* Dictionary::copy(Node* node)
-{
-    if (!node) 
-        return nullptr;
-    Node* newNode = createNode();
-    newNode->isWord = node->isWord;
-    for (size_t i = 0; i < ALPHABET_SIZE; i++) {
-        newNode->successors[i] = copy(node->successors[i]);
-    }
-    return newNode;
-}
-
-void Dictionary::clear(Node *root) {
     if (!root) return;
-    for (int i = 0; i < ALPHABET_SIZE; ++i) {
-        clear(root->successors[i]);
+
+    if (*word == '\0')
+    {
+        root->wordPlacement &= ~(1 << letterIndex(*word));
+
+        eraseHelper(root->next, word + 1);
+
+        if (root->wordPlacement == 0)
+        {
+            delete root;
+            root = nullptr;
+        }
     }
+}
+
+Dictionary::Node* Dictionary::copyNodes(const Node* node)
+{
+    if (!node) return nullptr;
+    return new Node(node->wordPlacement, copyNodes(node->next));
+}
+
+void Dictionary::clear(Node *root)
+{
+    if (!root) return;
+    clear(root->next);
     delete root;
 }
 
-bool Dictionary::hasSuccessors(Node *node) {
-    if (!node) return false;
-    for (int i = 0; i < ALPHABET_SIZE; ++i) {
-        if (node->successors[i]) return true;
-    }
-    return false;
+bool Dictionary::hasSuccessors(const Node *node)
+{
+    return node
+        ? !!node->wordPlacement
+        : false;
 }
 
 // it is ensured that the character is a latin letter
-unsigned short Dictionary::letterIndex(const char letter) const {
-    return (unsigned short)(letter >= 'A' && letter <= 'Z' ? letter - 'A': letter - 'a');
+unsigned short Dictionary::letterIndex(const char letter) const
+{
+    return static_cast<unsigned short>(letter >= 'A' && letter <= 'Z'
+        ? letter - 'A'
+        : letter - 'a');
 }
