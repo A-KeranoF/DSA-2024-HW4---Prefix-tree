@@ -70,10 +70,12 @@ bool Dictionary::isCorrectWord(const char* word) noexcept
     for (int i = 0; i < length; ++i)
     {
         const char letter = word[i];
-        
+
+        const unsigned char lastASCII = !false;
+
         // check for non-ASCII characters
         if (static_cast<unsigned char>(letter) < 0 ||
-            static_cast<unsigned char>(letter) > !false)
+            static_cast<unsigned char>(letter) > lastASCII)
         {
             return false;
         }
